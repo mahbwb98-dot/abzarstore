@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>پرداخت سفارش</title>
+</head>
+<body style="direction:rtl;font-family:tahoma;text-align:center;padding:40px;">
+
+<h2>💳 پرداخت سفارش</h2>
+
+<p>🏦 شماره کارت:</p>
+
+<h3 style="background:#eee;padding:10px;border-radius:10px;">
+5047 0610 6239 7142
+</h3>
+
+<p>👤 نام صاحب کارت:</p>
+
+<h3 style="background:#eee;padding:10px;border-radius:10px;">
+مهدی نصیری
+</h3>
+
+<hr>
+
+<p>📸 اگر پرداخت کردی میتونی بعداً رسید رو در این بخش آپلود کنی</p>
+
+<button onclick="confirmPayment()" style="padding:10px 20px;background:#1976d2;color:white;border:none;border-radius:8px;">
+✅ من پرداخت کردم
+</button>
+
+<script>
+
+function confirmPayment(){
+
+let orders=JSON.parse(localStorage.getItem("orders"))||[];
+let lastOrder=orders[orders.length-1];
+
+if(lastOrder){
+lastOrder.status="در انتظار تایید پرداخت";
+localStorage.setItem("orders",JSON.stringify(orders));
+}
+
+alert("✅ پرداخت ثبت شد");
+window.location.href="index.html";
+
+}
+
+</script>
+
+</body>
+</html>

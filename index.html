@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ابزارسرای مدرن</title>
+
+<style>
+
+body{
+direction:rtl;
+font-family:tahoma;
+background:#f4f6f9;
+margin:0;
+padding:20px;
+}
+
+h1{text-align:center;color:#1976d2;}
+
+.box{
+background:white;
+padding:15px;
+border-radius:15px;
+box-shadow:0 5px 15px rgba(0,0,0,0.08);
+margin-bottom:20px;
+}
+
+#products{
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+gap:20px;
+}
+
+.product{
+background:white;
+padding:15px;
+border-radius:20px;
+box-shadow:0 5px 15px rgba(0,0,0,0.08);
+}
+
+.product img{
+width:100%;
+border-radius:10px;
+}
+
+button{
+background:#1976d2;
+color:white;
+border:none;
+padding:6px 12px;
+border-radius:8px;
+cursor:pointer;
+}
+
+button:hover{
+background:#0d47a1;
+}
+
+#bottomNav{
+position:fixed;
+bottom:0;
+left:0;
+width:100%;
+background:white;
+display:flex;
+justify-content:space-around;
+padding:10px;
+box-shadow:0 -4px 15px rgba(0,0,0,0.1);
+}
+
+#chatBox{
+display:none;
+position:fixed;
+bottom:0;
+left:0;
+width:100%;
+height:60%;
+background:white;
+padding:15px;
+overflow:auto;
+box-shadow:0 -5px 20px rgba(0,0,0,0.3);
+}
+
+</style>
+</head>
+<body>
+
+<h1>⚙ ابزارسرای مدرن</h1>
+<p style="text-align:center;">🛠 ابزار حرفه‌ای | قیمت مناسب | ارسال سریع</p>
+
+<!-- 🔐 لاگین -->
+<div class="box" id="authBox">
+<h3>ورود / ثبت‌نام</h3>
+<input type="text" id="username" placeholder="نام کاربری">
+<input type="password" id="password" placeholder="رمز">
+<br><br>
+<button onclick="register()">ثبت‌نام</button>
+<button onclick="login()">ورود</button>
+</div>
+
+<!-- 🛍 محصولات -->
+<div id="products"></div>
+
+<hr>
+
+<h3>🛒 سبد خرید</h3>
+<div id="cart"></div>
+<p>💰 مجموع: <span id="total">0</span></p>
+<button onclick="checkout()">ثبت سفارش و پرداخت</button>
+
+<!-- 💬 چت -->
+<button onclick="openChat()" style="position:fixed;bottom:120px;right:20px;padding:15px;border-radius:50%;">💬</button>
+
+<div id="chatBox">
+<h3>پشتیبانی</h3>
+<div id="messages"></div>
+<input type="text" id="chatInput">
+<button onclick="sendMessage()">ارسال</button>
+<button onclick="closeChat()">بستن</button>
+</div>
+
+<!-- 📱 نوار پایین -->
+<div id="bottomNav">
+<div onclick="scrollToTop()">🏠 خانه</div>
+<div onclick="openProfile()">👤 پروفایل</div>
+<div onclick="openChat()">💬 چت</div>
+</div>
+
+<script>
+
+/* ================= کاربران ================= */
+
+function register(){
+
+let users=JSON.parse(localStorage.getItem("users"))||[];
+
+users.push({
+username:username.value,
+password:btoa(password.value)
+});
+
+localStorage.setItem("users",JSON.stringify(users));
+alert("✅ ثبت‌نام شد");
+
+}
+
+function login(){
+
+let users=JSON.parse(localStorage.getItem("users"))||[];
+
+let found=users.find(u=>u.username===username.value && u.password===btoa(password.value));
+
+if(found){
+localStorage.setItem("currentUser",username.value);
+alert("✅ وارد شدی");
+document.getElementById("authBox").style.display="none";
+loadCart();
+loadProducts();
+}
+else{
+alert("❌ اطلاعات اشتباه");
+}
+
+}
+
+/* ================= محصولات ================= */
+
+function loadProducts(){
+
+let products=JSON.parse(localStorage.getItem("products"))||[];
+let box=document.getElementById("products");
+box.innerHTML="";
+
+products.forEach((p,i)=>{
+
+box.innerHTML+=`
+<div class="product">
+${p.image ? `<img src="${p.image}">` : ""}
+<h3>${p.name}</h3>
+<p>${p.price} تومان</p>
+<p>📦 موجودی: ${p.stock}</p>
+<button onclick="add(${i})" ${p.stock<=0?"disabled":""}>
+افزودن
+</button>
+</div>
+`;
+
+});
+
+}
+
+let cart=[];
+
+/* افزودن به سبد */
+
+function add(index){
+
+let products=JSON.parse(localStorage.getItem("products"))||[];
+let item=products[index];
+
+let exist=cart.find(p=>p.name===item.name);
+
+if(exist){
+exist.qty=(exist.qty||1)+1;
+}
+else{
+cart.push({...item,qty:1});
+}
+
+renderCart();
+
+}
+
+/* سبد */
+
+function renderCart(){
+
+let box=document.getElementById("cart");
+box.innerHTML="";
+let total=0;
+
+cart.forEach((item,i)=>{
+
+total+=item.price*(item.qty||1);
+
+box.innerHTML+=`
+<p>
+${item.name}
+➖ <button onclick="changeQty(${i},-1)">-</button>
+${item.qty}
+<button onclick="changeQty(${i},1)">+</button>
+❌ <button onclick="cart.splice(${i},1);renderCart()">حذف</button>
+</p>
+`;
+
+});
+
+document.getElementById("total").innerText=total;
+
+}
+
+function changeQty(index,amount){
+
+cart[index].qty+=amount;
+
+if(cart[index].qty<=0){
+cart.splice(index,1);
+}
+
+renderCart();
+
+}
+
+/* ================= ثبت سفارش ================= */
+
+function checkout(){
+
+let user=localStorage.getItem("currentUser");
+
+if(!user){
+alert("ابتدا وارد شوید");
+return;
+}
+
+let orders=JSON.parse(localStorage.getItem("orders"))||[];
+
+orders.push({
+user:user,
+cart:cart,
+status:"در حال بررسی",
+date:new Date().toLocaleString(),
+orderId:Date.now()
+});
+
+localStorage.setItem("orders",JSON.stringify(orders));
+
+cart=[];
+renderCart();
+
+alert("✅ سفارش ثبت شد");
+window.location.href="payment.html";
+
+}
+
+/* ================= چت ================= */
+
+function openChat(){
+document.getElementById("chatBox").style.display="block";
+loadMessages();
+}
+
+function closeChat(){
+document.getElementById("chatBox").style.display="none";
+}
+
+function sendMessage(){
+
+let user=localStorage.getItem("currentUser");
+if(!user){alert("ابتدا وارد شوید");return;}
+
+let messages=JSON.parse(localStorage.getItem("messages"))||[];
+
+messages.push({
+user:user,
+sender:"user",
+text:chatInput.value,
+time:new Date().toLocaleString()
+});
+
+localStorage.setItem("messages",JSON.stringify(messages));
+chatInput.value="";
+loadMessages();
+
+}
+
+function loadMessages(){
+
+let user=localStorage.getItem("currentUser");
+let messages=JSON.parse(localStorage.getItem("messages"))||[];
+let box=document.getElementById("messages");
+
+box.innerHTML="";
+
+messages.filter(m=>m.user===user).forEach(m=>{
+
+box.innerHTML+=`
+<div style="background:#eee;padding:8px;margin:5px;border-radius:10px;">
+<b>${m.sender}</b>
+<p>${m.text}</p>
+</div>
+`;
+
+});
+
+}
+
+/* ================= پروفایل ================= */
+
+function openProfile(){
+
+let user=localStorage.getItem("currentUser");
+if(!user){alert("ابتدا وارد شوید");return;}
+
+let orders=JSON.parse(localStorage.getItem("orders"))||[];
+let myOrders=orders.filter(o=>o.user===user);
+
+alert("📦 تعداد سفارش‌های شما: "+myOrders.length);
+
+}
+
+function scrollToTop(){
+window.scrollTo({top:0,behavior:"smooth"});
+}
+
+loadProducts();
+
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js')
+  .then(() => {
+    console.log("Service Worker Registered ✅");
+  })
+  .catch(err => {
+    console.log("Service Worker Failed ❌", err);
+  });
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js')
+  .then(() => {
+    console.log("Service Worker Registered ✅");
+  })
+  .catch(err => {
+    console.log("Service Worker Failed ❌", err);
+  });
+}
+</script>
+</body>
+</html>

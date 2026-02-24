@@ -1,0 +1,384 @@
+
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>پنل ادمین ابزارسرای مدرن</title>
+
+<!-- کتابخانه ها -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+
+body{
+direction:rtl;
+font-family:tahoma;
+background:#f4f6f9;
+padding:20px;
+}
+
+h2{text-align:center;}
+
+.box{
+background:white;
+padding:15px;
+border-radius:15px;
+margin-bottom:20px;
+box-shadow:0 5px 15px rgba(0,0,0,0.08);
+}
+
+button{
+background:#1976d2;
+color:white;
+border:none;
+padding:6px 12px;
+border-radius:8px;
+cursor:pointer;
+margin:4px;
+}
+
+button:hover{
+background:#0d47a1;
+}
+
+select,input{
+padding:6px;
+border-radius:6px;
+margin:4px;
+}
+
+.notification{
+background:#ffeb3b;
+padding:10px;
+border-radius:10px;
+display:none;
+margin-bottom:10px;
+}
+
+</style>
+</head>
+<body>
+
+<!-- 🔐 لاگین -->
+<div id="loginBox" style="text-align:center;margin-top:100px;">
+<h2>🔐 ورود ادمین</h2>
+<input type="password" id="adminPass" placeholder="رمز">
+<br><br>
+<button onclick="loginAdmin()">ورود</button>
+</div>
+
+<!-- پنل اصلی -->
+<div id="adminPanel" style="display:none;">
+
+<h2>👑 پنل مدیریت ابزارسرای مدرن</h2>
+
+<div class="notification" id="notification">
+🔔 اعلان جدید
+</div>
+
+<!-- آمار -->
+<div class="box">
+<h3>📊 آمار فروش</h3>
+<p>📦 تعداد سفارش: <span id="orderCount"></span></p>
+<p>💰 مجموع فروش: <span id="totalSales"></span></p>
+<canvas id="chart" height="120"></canvas>
+
+<button onclick="downloadExcel()">📥 دانلود اکسل</button>
+
+</div>
+
+<!-- سفارش‌ها -->
+<div class="box">
+<h3>📦 سفارش‌ها</h3>
+<div id="orders"></div>
+</div>
+
+<!-- پیام‌ها -->
+<div class="box">
+<h3>💬 پیام‌ها</h3>
+<div id="messages"></div>
+</div>
+
+<!-- محصولات -->
+<div class="box">
+<h3>🛍 مدیریت محصولات</h3>
+
+<input type="text" id="pname" placeholder="نام محصول">
+<input type="number" id="pprice" placeholder="قیمت">
+<input type="number" id="pstock" placeholder="موجودی">
+<input type="text" id="pcat" placeholder="دسته بندی">
+<input type="file" id="pimage" accept="image/*">
+
+<button onclick="addProduct()">➕ افزودن محصول</button>
+
+<hr>
+
+<div id="products"></div>
+
+</div>
+
+</div>
+
+<script>
+
+/* 🔐 لاگین */
+
+function loginAdmin(){
+
+let pass=document.getElementById("adminPass").value;
+
+if(pass==="1234"){
+document.getElementById("loginBox").style.display="none";
+document.getElementById("adminPanel").style.display="block";
+render();
+}
+else{
+alert("❌ رمز اشتباه");
+}
+
+}
+
+/* ================= رندر کلی ================= */
+
+function render(){
+loadOrders();
+loadMessages();
+loadProducts();
+loadStats();
+checkNotifications();
+}
+
+/* ================= سفارش‌ها ================= */
+
+function loadOrders(){
+
+let orders=JSON.parse(localStorage.getItem("orders"))||[];
+let box=document.getElementById("orders");
+box.innerHTML="";
+
+let total=0;
+
+orders.forEach((o,index)=>{
+
+o.cart.forEach(item=>{
+total+=item.price*(item.qty||1);
+});
+
+box.innerHTML+=`
+<div class="box">
+<p>👤 ${o.user}</p>
+<p>📌 وضعیت: ${o.status}</p>
+
+${o.receipt ? `<img src="${o.receipt}" width="120">` : ""}
+
+<select onchange="changeStatus(${index},this.value)">
+<option>در حال بررسی</option>
+<option>در حال آماده‌سازی</option>
+<option>در حال ارسال</option>
+<option>تحویل داده شد</option>
+</select>
+
+<button onclick="approvePayment(${index})">✅ تایید پرداخت</button>
+<button onclick="deleteOrder(${index})">❌ حذف</button>
+
+</div>
+`;
+
+});
+
+document.getElementById("orderCount").innerText=orders.length;
+document.getElementById("totalSales").innerText=total;
+
+}
+
+/* تغییر وضعیت */
+
+function changeStatus(index,status){
+
+let orders=JSON.parse(localStorage.getItem("orders"))||[];
+orders[index].status=status;
+localStorage.setItem("orders",JSON.stringify(orders));
+loadOrders();
+
+}
+
+/* تایید پرداخت */
+
+function approvePayment(index){
+
+let orders=JSON.parse(localStorage.getItem("orders"))||[];
+
+orders[index].status="✅ پرداخت تایید شد";
+
+localStorage.setItem("orders",JSON.stringify(orders));
+
+generateInvoice(orders[index]);
+
+alert("✅ پرداخت تایید شد + فاکتور ساخته شد");
+
+loadOrders();
+
+}
+
+/* حذف سفارش */
+
+function deleteOrder(index){
+
+let orders=JSON.parse(localStorage.getItem("orders"))||[];
+orders.splice(index,1);
+localStorage.setItem("orders",JSON.stringify(orders));
+loadOrders();
+
+}
+
+/* ================= فاکتور ================= */
+
+function generateInvoice(order){
+
+const { jsPDF } = window.jspdf;
+const doc = new jsPDF();
+
+doc.text("فاکتور ابزارسرای مدرن",20,20);
+doc.text("مشتری: "+order.user,20,30);
+
+let y=50;
+let total=0;
+
+order.cart.forEach(item=>{
+doc.text(item.name+" x"+(item.qty||1),20,y);
+total+=item.price*(item.qty||1);
+y+=10;
+});
+
+doc.text("مجموع: "+total,20,y+10);
+
+doc.save("Invoice_"+order.orderId+".pdf");
+
+}
+
+/* ================= محصولات ================= */
+
+function addProduct(){
+
+let products=JSON.parse(localStorage.getItem("products"))||[];
+
+let file=document.getElementById("pimage").files[0];
+let reader=new FileReader();
+
+reader.onload=function(){
+
+products.push({
+name:pname.value,
+price:parseInt(pprice.value),
+stock:parseInt(pstock.value),
+category:pcat.value,
+image:reader.result
+});
+
+localStorage.setItem("products",JSON.stringify(products));
+loadProducts();
+
+};
+
+if(file){
+reader.readAsDataURL(file);
+}
+
+}
+
+function loadProducts(){
+
+let products=JSON.parse(localStorage.getItem("products"))||[];
+let box=document.getElementById("products");
+box.innerHTML="";
+
+products.forEach((p,index)=>{
+
+box.innerHTML+=`
+<div class="box">
+${p.image ? `<img src="${p.image}" width="100">` : ""}
+<p>${p.name} - ${p.price}</p>
+<button onclick="deleteProduct(${index})">❌</button>
+</div>
+`;
+
+});
+
+}
+
+function deleteProduct(index){
+
+let products=JSON.parse(localStorage.getItem("products"))||[];
+products.splice(index,1);
+localStorage.setItem("products",JSON.stringify(products));
+loadProducts();
+
+}
+
+/* ================= آمار ================= */
+
+function loadStats(){
+
+let orders=JSON.parse(localStorage.getItem("orders"))||[];
+
+let ctx=document.getElementById("chart").getContext("2d");
+
+new Chart(ctx,{
+type:"bar",
+data:{
+labels:["سفارش‌ها"],
+datasets:[{
+label:"تعداد",
+data:[orders.length],
+backgroundColor:"#1976d2"
+}]
+}
+});
+
+}
+
+/* ================= اعلان ================= */
+
+function checkNotifications(){
+
+let orders=JSON.parse(localStorage.getItem("orders"))||[];
+let messages=JSON.parse(localStorage.getItem("messages"))||[];
+
+if(orders.length>0 || messages.length>0){
+document.getElementById("notification").style.display="block";
+}
+
+}
+
+function downloadExcel(){
+
+let orders=JSON.parse(localStorage.getItem("orders"))||[];
+let data=[];
+
+orders.forEach(o=>{
+o.cart.forEach(item=>{
+data.push({
+کاربر:o.user,
+محصول:item.name,
+قیمت:item.price,
+وضعیت:o.status
+});
+});
+});
+
+let ws=XLSX.utils.json_to_sheet(data);
+let wb=XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(wb,ws,"Orders");
+XLSX.writeFile(wb,"report.xlsx");
+
+}
+
+render();
+
+</script>
+
+</body>
+</html>
